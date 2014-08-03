@@ -2,16 +2,37 @@
 
 import os
 import re
+import sys
 import zipfile
 import subprocess
 from configparser import ConfigParser
+from baker import Baker
+
+class MyBaker(Baker):
+    def run_all(self, args=sys.argv):
+        arg0 = args[0]
+        args = args[1:]
+        a = []
+        for arg in args:
+            if arg in self.commands:
+                if a:
+                    self.run(a)
+                a = [arg0]
+            a.append(arg)
+
+        if a:
+            self.run(a)
+
+vim = MyBaker()
 
 VIM_URL = "https://vim.googlecode.com/hg"
 
-def get_source(target):
+@vim.command()
+def get(target='.'):
     subprocess.check_call(['hg', 'clone', VIM_URL, 'vim'], cwd=target)
 
-def patch(target):
+@vim.command()
+def patch(target='.'):
     repo = os.path.join(target, 'vim')
     cp = ConfigParser(allow_no_value=True)
     cp.read('patches/patches.ini')
@@ -36,14 +57,16 @@ nmake /f make_mvc.mak CPUNR=i686 WINVER=0x0500
 nmake /f make_mvc.mak GUI=yes CPUNR=i686 WINVER=0x0500
 """.format(get_vsvars())
 
-def build(target):
+@vim.command()
+def build(target='.'):
     batfile = os.path.join(target, 'do_build.cmd')
     with open(batfile, "w") as f:
         f.write(BUILD_SCRIPT)
 
     subprocess.check_call(['cmd', '/c', batfile], cwd=target)
 
-def package(target):
+@vim.command()
+def package(target='.'):
     def src(name):
         return os.path.join(target, 'vim', 'src', name)
     runtime = os.path.join(target, 'vim', 'runtime')
@@ -69,10 +92,14 @@ def package(target):
             zf.write(fullpath, zip_path)
     zf.close()
 
-if __name__ == '__main__':
+@vim.command()
+def all():
     from tempfile import TemporaryDirectory
     with TemporaryDirectory() as d:
-        get_source(d)
+        get(d)
         patch(d)
         build(d)
         package(d)
+
+if __name__ == '__main__':
+    vim.run_all()
