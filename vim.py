@@ -62,10 +62,8 @@ def get_vsvars(python):
 BUILD_SCRIPT = """\
 call "{vs}" {arch}
 cd vim\\src
-nmake /f make_mvc.mak CPUNR=i686 WINVER=0x0500 {py} clean
-nmake /f make_mvc.mak GUI=yes CPUNR=i686 WINVER=0x0500 {py} clean
-nmake /f make_mvc.mak CPUNR=i686 WINVER=0x0500 {py}
-nmake /f make_mvc.mak GUI=yes CPUNR=i686 WINVER=0x0500 {py}
+nmake /f make_mvc.mak CPUNR=i686 WINVER=0x0500 {py} {make}
+nmake /f make_mvc.mak GUI=yes CPUNR=i686 WINVER=0x0500 {py} {make}
 """
 
 PY = 'PYTHON{v}="{prefix}" DYNAMIC_PYTHON{v}=yes PYTHON{v}_VER={vv}'.format(
@@ -74,13 +72,13 @@ PY = 'PYTHON{v}="{prefix}" DYNAMIC_PYTHON{v}=yes PYTHON{v}_VER={vv}'.format(
         prefix=sys.prefix)
 
 @vim.command()
-def build(target='.', python=True):
+def build(target='.', python=True, make=''):
     batbase = 'do_build.cmd'
     batfile = os.path.join(target, batbase)
     vs = get_vsvars(python)
     py = PY if python else ""
     arch = "amd64" if platform.architecture()[0] == '64bit' else "x86"
-    bat = BUILD_SCRIPT.format(vs=vs, arch=arch, py=py)
+    bat = BUILD_SCRIPT.format(vs=vs, arch=arch, py=py, make=make)
     with open(batfile, "w") as f:
         f.write(bat)
 
