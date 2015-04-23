@@ -4,6 +4,7 @@ import os
 import re
 import sys
 import zipfile
+import platform
 import subprocess
 from configparser import ConfigParser
 from baker import Baker
@@ -44,26 +45,46 @@ def patch(target='.'):
         ])
     
 
-def get_vsvars():
-    for vc in ('VS100COMNTOOLS', 'VS90COMNTOOLS'):
+def get_vsvars(python):
+    if python:
+        from distutils.msvccompiler import get_build_version
+        env = 'VS{}COMNTOOLS'.format(int(get_build_version() * 10))
+        envlist = (env,)
+    else:
+        envlist = ('VS100COMNTOOLS', 'VS90COMNTOOLS')
+    for vc in envlist:
         if vc in os.environ:
-            return os.path.join(os.environ[vc], 'vsvars32.bat')
-    raise RuntimeError("Cannot find Visual Studio 2008 or 2010")
+            bat = os.path.join(os.environ[vc], '..', '..', 'VC', 'vcvarsall.bat')
+            if os.path.exists(bat):
+                return bat
+    raise RuntimeError("Cannot find a suitable version of Visual Studio")
 
 BUILD_SCRIPT = """\
-call "{}"
+call "{vs}" {arch}
 cd vim\\src
-nmake /f make_mvc.mak CPUNR=i686 WINVER=0x0500
-nmake /f make_mvc.mak GUI=yes CPUNR=i686 WINVER=0x0500
-""".format(get_vsvars())
+nmake /f make_mvc.mak CPUNR=i686 WINVER=0x0500 {py} clean
+nmake /f make_mvc.mak GUI=yes CPUNR=i686 WINVER=0x0500 {py} clean
+nmake /f make_mvc.mak CPUNR=i686 WINVER=0x0500 {py}
+nmake /f make_mvc.mak GUI=yes CPUNR=i686 WINVER=0x0500 {py}
+"""
+
+PY = 'PYTHON{v}="{prefix}" DYNAMIC_PYTHON{v}=yes PYTHON{v}_VER={vv}'.format(
+        v="" if sys.version_info[0] == 2 else "3",
+        vv="{0[0]}{0[1]}".format(sys.version_info),
+        prefix=sys.prefix)
 
 @vim.command()
-def build(target='.'):
-    batfile = os.path.join(target, 'do_build.cmd')
+def build(target='.', python=True):
+    batbase = 'do_build.cmd'
+    batfile = os.path.join(target, batbase)
+    vs = get_vsvars(python)
+    py = PY if python else ""
+    arch = "amd64" if platform.architecture()[0] == '64bit' else "x86"
+    bat = BUILD_SCRIPT.format(vs=vs, arch=arch, py=py)
     with open(batfile, "w") as f:
-        f.write(BUILD_SCRIPT)
+        f.write(bat)
 
-    subprocess.check_call(['cmd', '/c', batfile], cwd=target)
+    subprocess.check_call(['cmd', '/c', batbase], cwd=target)
 
 @vim.command()
 def package(target='.'):
@@ -93,12 +114,12 @@ def package(target='.'):
     zf.close()
 
 @vim.command()
-def all():
+def all(python=True):
     from tempfile import TemporaryDirectory
     with TemporaryDirectory() as d:
         get(d)
         patch(d)
-        build(d)
+        build(d, python)
         package(d)
 
 if __name__ == '__main__':
