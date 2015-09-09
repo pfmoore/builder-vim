@@ -26,11 +26,11 @@ class MyBaker(Baker):
 
 vim = MyBaker()
 
-VIM_URL = "https://vim.googlecode.com/hg"
+VIM_URL = "https://github.com/vim/vim.git"
 
 @vim.command()
 def get(target='.'):
-    subprocess.check_call(['hg', 'clone', VIM_URL, 'vim'], cwd=target)
+    subprocess.check_call(['git', 'clone', VIM_URL, 'vim'], cwd=target)
 
 @vim.command()
 def patch(target='.'):
@@ -39,9 +39,12 @@ def patch(target='.'):
     cp.read('patches/patches.ini')
     for patch, _ in cp.items('patches'):
         subprocess.check_call([
-            'hg', '-R', repo, 'import',
-            os.path.join('patches', patch),
-            '-m', cp[patch]['message']
+            'git', '-C', repo, 'apply',
+            os.path.join('patches', patch)
+        ])
+        subprocess.check_call([
+            'git', '-C', repo, 'commit',
+            '-am', cp[patch]['message']
         ])
     
 
