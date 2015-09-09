@@ -3,11 +3,17 @@
 import os
 import re
 import sys
+import stat
+import shutil
 import zipfile
+import tempfile
 import platform
 import subprocess
 from configparser import ConfigParser
 from baker import Baker
+from urllib.request import urlopen
+
+HERE = os.path.dirname(os.path.abspath(__file__))
 
 class MyBaker(Baker):
     def run_all(self, args=sys.argv):
@@ -27,6 +33,7 @@ class MyBaker(Baker):
 vim = MyBaker()
 
 VIM_URL = "https://github.com/vim/vim.git"
+SDK_DIR = "C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v7.1A\\Include"
 
 @vim.command()
 def get(target='.'):
@@ -49,24 +56,26 @@ def patch(target='.'):
     
 
 def get_vsvars(python):
+    sdk_dir = None
     if python:
         from distutils.msvccompiler import get_build_version
-        env = 'VS{}COMNTOOLS'.format(int(get_build_version() * 10))
-        envlist = (env,)
+        vc = int(get_build_version() * 10)
+        vclist = (vc,)
     else:
-        envlist = ('VS100COMNTOOLS', 'VS90COMNTOOLS')
-    for vc in envlist:
-        if vc in os.environ:
-            bat = os.path.join(os.environ[vc], '..', '..', 'VC', 'vcvarsall.bat')
+        vclist = (140, 100, 90)
+    for vc in vclist:
+        env = 'VS{}COMNTOOLS'.format(vc)
+        if env in os.environ:
+            bat = os.path.join(os.environ[env], '..', '..', 'VC', 'vcvarsall.bat')
             if os.path.exists(bat):
-                return bat
+                return bat, vc
     raise RuntimeError("Cannot find a suitable version of Visual Studio")
 
 BUILD_SCRIPT = """\
 call "{vs}" {arch}
 cd vim\\src
-nmake /f make_mvc.mak CPUNR=i686 WINVER=0x0500 {py} {make}
-nmake /f make_mvc.mak GUI=yes CPUNR=i686 WINVER=0x0500 {py} {make}
+nmake /f make_mvc.mak CPUNR=i686 WINVER=0x0500 {sdk} {py} {make}
+nmake /f make_mvc.mak GUI=yes CPUNR=i686 WINVER=0x0500 {sdk} {py} {make}
 """
 
 PY = 'PYTHON{v}="{prefix}" DYNAMIC_PYTHON{v}=yes PYTHON{v}_VER={vv}'.format(
@@ -78,10 +87,28 @@ PY = 'PYTHON{v}="{prefix}" DYNAMIC_PYTHON{v}=yes PYTHON{v}_VER={vv}'.format(
 def build(target='.', python=True, make=''):
     batbase = 'do_build.cmd'
     batfile = os.path.join(target, batbase)
-    vs = get_vsvars(python)
+    vs, vc = get_vsvars(python)
+    if vc == 140 and not os.path.exists(SDK_DIR):
+        raise RuntimeError("Visual Studio 2015 needs the V7.1A Windows SDK")
+
     py = PY if python else ""
     arch = "amd64" if platform.architecture()[0] == '64bit' else "x86"
-    bat = BUILD_SCRIPT.format(vs=vs, arch=arch, py=py, make=make)
+
+    sdk = ""
+    xpm = ""
+    if vc == 140:
+        sdk = 'SDK_INCLUDE_DIR="{}"'.format(SDK_DIR)
+        # The XPM library shipped with Vim doesn't work with Visual Studio 2015
+        # so we include our own here, obtained from
+        # http://windows.php.net/downloads/php-sdk/deps/vc14
+        xpm_dir = os.path.join(HERE, 'xpm')
+        for dirname in ('x86', 'x64'):
+            shutil.copyfile(
+                os.path.join(xpm_dir, dirname, 'lib', 'libXpm.lib'),
+                os.path.join(target, 'vim', 'src', 'xpm', dirname, 'lib', 'libXpm.lib')
+            )
+
+    bat = BUILD_SCRIPT.format(vs=vs, arch=arch, py=py, make=make, sdk=sdk)
     with open(batfile, "w") as f:
         f.write(bat)
 
@@ -114,14 +141,33 @@ def package(target='.'):
             zf.write(fullpath, zip_path)
     zf.close()
 
+
+# Copied from pip sources
+def rmtree_errorhandler(func, path, exc_info):
+    """On Windows, the files in .svn are read-only, so when rmtree() tries to
+    remove them, an exception is thrown.  We catch that here, remove the
+    read-only attribute, and hopefully continue without problems."""
+    # if file type currently read only
+    if os.stat(path).st_mode & stat.S_IREAD:
+        # convert to read/write
+        os.chmod(path, stat.S_IWRITE)
+        # use the original function to repeat the operation
+        func(path)
+        return
+    else:
+        raise
+
 @vim.command()
 def all(python=True):
-    from tempfile import TemporaryDirectory
-    with TemporaryDirectory() as d:
+    with tempfile.TemporaryDirectory() as d:
         get(d)
         patch(d)
         build(d, python)
         package(d)
+        # Git makes the .git subdirectory read-only,
+        # so we need to delete the checkout manually
+        # or the removal of the temp directory will fail.
+        shutil.rmtree(os.path.join(d, 'vim'), onerror=rmtree_errorhandler)
 
 if __name__ == '__main__':
     vim.run_all()
