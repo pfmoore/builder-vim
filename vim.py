@@ -74,8 +74,8 @@ def get_vsvars(python):
 BUILD_SCRIPT = """\
 call "{vs}" {arch}
 cd vim\\src
-nmake /f make_mvc.mak CPUNR=i686 WINVER=0x0500 {sdk} {py} {make}
-nmake /f make_mvc.mak GUI=yes CPUNR=i686 WINVER=0x0500 {sdk} {py} {make}
+nmake /f make_mvc.mak CPUNR=i686 WINVER=0x0500 {sdk} {py} {lua} {make}
+nmake /f make_mvc.mak GUI=yes CPUNR=i686 WINVER=0x0500 {sdk} {py} {lua} {make}
 """
 
 PY = 'PYTHON{v}="{prefix}" DYNAMIC_PYTHON{v}=yes PYTHON{v}_VER={vv}'.format(
@@ -84,7 +84,7 @@ PY = 'PYTHON{v}="{prefix}" DYNAMIC_PYTHON{v}=yes PYTHON{v}_VER={vv}'.format(
         prefix=sys.prefix)
 
 @vim.command()
-def build(target='.', python=True, make=''):
+def build(target='.', python=True, lua=True, make=''):
     batbase = 'do_build.cmd'
     batfile = os.path.join(target, batbase)
     vs, vc = get_vsvars(python)
@@ -92,23 +92,14 @@ def build(target='.', python=True, make=''):
         raise RuntimeError("Visual Studio 2015 needs the V7.1A Windows SDK")
 
     py = PY if python else ""
+    lua = "LUA={here}\\lua LUA_VER=53".format(here=HERE) if lua else ""
     arch = "amd64" if platform.architecture()[0] == '64bit' else "x86"
 
     sdk = ""
-    xpm = ""
     if vc == 140:
         sdk = 'SDK_INCLUDE_DIR="{}"'.format(SDK_DIR)
-        # The XPM library shipped with Vim doesn't work with Visual Studio 2015
-        # so we include our own here, obtained from
-        # http://windows.php.net/downloads/php-sdk/deps/vc14
-        xpm_dir = os.path.join(HERE, 'xpm')
-        for dirname in ('x86', 'x64'):
-            shutil.copyfile(
-                os.path.join(xpm_dir, dirname, 'lib', 'libXpm.lib'),
-                os.path.join(target, 'vim', 'src', 'xpm', dirname, 'lib', 'libXpm.lib')
-            )
 
-    bat = BUILD_SCRIPT.format(vs=vs, arch=arch, py=py, make=make, sdk=sdk)
+    bat = BUILD_SCRIPT.format(vs=vs, arch=arch, py=py, lua=lua, make=make, sdk=sdk)
     with open(batfile, "w") as f:
         f.write(bat)
 
@@ -133,7 +124,6 @@ def package(target='.'):
     zf.write(src('vimrun.exe'), 'Vim/vimrun.exe')
     zf.write(src('xxd/xxd.exe'), 'Vim/xxd.exe')
     zf.write(src('gvimext/gvimext.dll'), 'Vim/gvimext.dll')
-    zf.write(src('vimtbar.dll'), 'Vim/vimtbar.dll')
     for dirpath, dirnames, filenames in os.walk(runtime):
         for filename in filenames:
             fullpath = os.path.join(dirpath, filename)
@@ -158,11 +148,11 @@ def rmtree_errorhandler(func, path, exc_info):
         raise
 
 @vim.command()
-def all(python=True):
+def all(python=True, lua=True):
     with tempfile.TemporaryDirectory() as d:
         get(d)
         patch(d)
-        build(d, python)
+        build(d, python, lua)
         package(d)
         # Git makes the .git subdirectory read-only,
         # so we need to delete the checkout manually
