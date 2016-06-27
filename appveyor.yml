@@ -1,0 +1,4 @@
+build: off
+build_script: C:\Python35-x64\python.exe vim.py all
+artifacts:
+    - path: Vim.zip
