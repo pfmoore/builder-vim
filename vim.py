@@ -59,7 +59,7 @@ def get_vsvars(python):
     sdk_dir = None
     if python:
         from distutils.msvccompiler import get_build_version
-        vc = int(get_build_version() * 10)
+        vc = int(get_build_version()) * 10
         vclist = (vc,)
     else:
         vclist = (140, 100, 90)
@@ -160,4 +160,6 @@ def all(python=True, lua=True):
         shutil.rmtree(os.path.join(d, 'vim'), onerror=rmtree_errorhandler)
 
 if __name__ == '__main__':
+    for var in os.environ:
+        print(var, os.environ[var])
     vim.run_all()
