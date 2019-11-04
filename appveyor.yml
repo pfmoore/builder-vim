@@ -1,4 +1,24 @@
 build: off
-build_script: C:\Python37-x64\python.exe vim.py all
+build_script:
+    - ps: |
+        C:\Python37-x64\python.exe vim.py all
+        Set-AppveyorBuildVariable -Name VIM_TAG -Value (Get-Content version.txt)
+
 artifacts:
-    - path: Vim.zip
+    - path: vim*.zip
+
+# MUST SET DO NOT BUILD ON TAGS OR YOU GET AN INFINITE LOOP!
+# https://help.appveyor.com/discussions/problems/1557-release-to-github-causes-additional-build
+skip_tags: true
+
+deploy:
+  release: $(VIM_TAG)
+  description: 'Release description'
+  provider: GitHub
+  auth_token:
+    secure: /zp2jySKlXy6bBkPZMJ1TVetLji2hciXkHNNW91Yhv08U5ya+BbaS7OQV2Ru/2oe
+  artifact: /.*\.zip/
+  draft: false
+  prerelease: false
+  on:
+    branch: master

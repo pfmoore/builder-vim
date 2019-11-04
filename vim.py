@@ -38,6 +38,12 @@ SDK_DIR = "C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v7.1A\\Include"
 @vim.command()
 def get(target='.'):
     subprocess.check_call(['git', 'clone', VIM_URL, 'vim'], cwd=target)
+    version = subprocess.check_output(
+        ['git', 'describe', '--tags'],
+        universal_newlines=True,
+        cwd=os.path.join(target, 'vim')
+    ).strip()
+    return version
 
 @vim.command()
 def patch(target='.'):
@@ -106,7 +112,7 @@ def build(target='.', python=True, lua=True, make=''):
     subprocess.check_call(['cmd', '/c', batbase], cwd=target)
 
 @vim.command()
-def package(target='.'):
+def package(target='.', version='unknown'):
     def src(name):
         return os.path.join(target, 'vim', 'src', name)
     runtime = os.path.join(target, 'vim', 'runtime')
@@ -115,8 +121,8 @@ def package(target='.'):
     with open(src('version.h')) as f:
         VIMRTDIR = version_re.match(f.read()).group(1)
 
-
-    print("Writing {}".format(os.path.join(os.getcwd(), 'Vim.zip')))
+    zip_name = 'vim-{}.zip'.format(version)
+    print("Writing {}".format(os.path.join(os.getcwd(), zip_name)))
 
     zf = zipfile.ZipFile('Vim.zip', 'w', compression=zipfile.ZIP_DEFLATED)
     zf.write(src('vim.exe'), 'Vim/vim.exe')
@@ -150,14 +156,16 @@ def rmtree_errorhandler(func, path, exc_info):
 @vim.command()
 def all(python=True, lua=True):
     with tempfile.TemporaryDirectory() as d:
-        get(d)
+        version = get(d)
         patch(d)
         build(d, python, lua)
-        package(d)
+        package(d, version)
         # Git makes the .git subdirectory read-only,
         # so we need to delete the checkout manually
         # or the removal of the temp directory will fail.
         shutil.rmtree(os.path.join(d, 'vim'), onerror=rmtree_errorhandler)
+        with open('version.txt', 'w') as f:
+            f.write(version)
 
 if __name__ == '__main__':
     for var in os.environ:
