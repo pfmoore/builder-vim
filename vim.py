@@ -111,6 +111,10 @@ def build(target='.', python=True, lua=True, make=''):
 
     subprocess.check_call(['cmd', '/c', batbase], cwd=target)
 
+EMBEDDED_PYTHON = "https://www.python.org/ftp/python/{ver}/python-{ver}-embed-amd64.zip".format(
+    ver="{0.major}.{0.minor}.{0.micro}".format(sys.version_info)
+)
+
 @vim.command()
 def package(target='.', version='unknown'):
     def src(name):
@@ -124,7 +128,7 @@ def package(target='.', version='unknown'):
     zip_name = 'vim-{}.zip'.format(version)
     print("Writing {}".format(os.path.join(os.getcwd(), zip_name)))
 
-    zf = zipfile.ZipFile('Vim.zip', 'w', compression=zipfile.ZIP_DEFLATED)
+    zf = zipfile.ZipFile(zip_name, 'w', compression=zipfile.ZIP_DEFLATED)
     zf.write(src('vim.exe'), 'Vim/vim.exe')
     zf.write(src('gvim.exe'), 'Vim/gvim.exe')
     zf.write(src('vimrun.exe'), 'Vim/vimrun.exe')
@@ -135,6 +139,12 @@ def package(target='.', version='unknown'):
             fullpath = os.path.join(dirpath, filename)
             zip_path = 'Vim/' + VIMRTDIR + '/' + os.path.relpath(fullpath, runtime)
             zf.write(fullpath, zip_path)
+    with urlopen(EMBEDDED_PYTHON) as e:
+        with open('tmp.zip', 'wb') as f:
+            f.write(e.read())
+        with zipfile.ZipFile('tmp.zip') as ep:
+            for n in ep.namelist():
+                zf.writestr('Vim/python/' + n, ep.read(n))
     zf.close()
 
 
