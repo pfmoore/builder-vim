@@ -5,11 +5,13 @@ import re
 import sys
 import stat
 import shutil
+import hashlib
 import zipfile
 import tempfile
 import platform
 import subprocess
 from configparser import ConfigParser
+from pathlib import Path
 from baker import Baker
 from urllib.request import urlopen
 
@@ -148,6 +150,12 @@ def package(target='.', version='unknown'):
             for n in ep.namelist():
                 zf.writestr('Vim/python/' + n, ep.read(n))
     zf.close()
+
+    m = hashlib.sha256()
+    m.update(Path(zip_name).read_bytes())
+    print("=" * 70)
+    print(f"SHA256 Hash = {m.hexdigest()}")
+    print("=" * 70)
 
 
 # Copied from pip sources
