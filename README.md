@@ -16,3 +16,8 @@ entry which gives the commit message to use.
 Patches must always use Unix line endings. The ```.gitattributes``` file
 ensures that all files with extension ```.patch``` will have LF line endings
 retained.
+
+CI Status
+---------
+
+[![Build status](https://ci.appveyor.com/api/projects/status/oeb73agml700kxq5/branch/master?svg=true)](https://ci.appveyor.com/project/pfmoore/builder-vim/branch/master)
