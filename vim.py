@@ -43,6 +43,8 @@ def get(target='.'):
         universal_newlines=True,
         cwd=os.path.join(target, 'vim')
     ).strip()
+    if version.startswith('v'):
+        version = version[1:]
     return version
 
 @vim.command()
