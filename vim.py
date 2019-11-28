@@ -156,6 +156,7 @@ def package(target='.', version='unknown'):
     print("=" * 70)
     print(f"SHA256 Hash = {m.hexdigest()}")
     print("=" * 70)
+    Path(zip_name + ".sha256").write_text(m.hexdigest(), encoding="ascii")
 
 
 # Copied from pip sources

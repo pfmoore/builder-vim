@@ -6,6 +6,7 @@ build_script:
 
 artifacts:
     - path: vim*.zip
+    - path: vim*.zip.sha256
 
 # MUST SET DO NOT BUILD ON TAGS OR YOU GET AN INFINITE LOOP!
 # https://help.appveyor.com/discussions/problems/1557-release-to-github-causes-additional-build
@@ -17,7 +18,7 @@ deploy:
   provider: GitHub
   auth_token:
     secure: /zp2jySKlXy6bBkPZMJ1TVetLji2hciXkHNNW91Yhv08U5ya+BbaS7OQV2Ru/2oe
-  artifact: /.*\.zip/
+  artifact: /.*\.zip.*/
   draft: false
   prerelease: false
   on:
