@@ -133,22 +133,22 @@ def package(target='.', version='unknown'):
     print("Writing {}".format(os.path.join(os.getcwd(), zip_name)))
 
     zf = zipfile.ZipFile(zip_name, 'w', compression=zipfile.ZIP_DEFLATED)
-    zf.write(src('vim.exe'), 'Vim/vim.exe')
-    zf.write(src('gvim.exe'), 'Vim/gvim.exe')
-    zf.write(src('vimrun.exe'), 'Vim/vimrun.exe')
-    zf.write(src('xxd/xxd.exe'), 'Vim/xxd.exe')
-    zf.write(src('gvimext/gvimext.dll'), 'Vim/gvimext.dll')
+    zf.write(src('vim.exe'), 'vim.exe')
+    zf.write(src('gvim.exe'), 'gvim.exe')
+    zf.write(src('vimrun.exe'), 'vimrun.exe')
+    zf.write(src('xxd/xxd.exe'), 'xxd.exe')
+    zf.write(src('gvimext/gvimext.dll'), 'gvimext.dll')
     for dirpath, dirnames, filenames in os.walk(runtime):
         for filename in filenames:
             fullpath = os.path.join(dirpath, filename)
-            zip_path = 'Vim/' + VIMRTDIR + '/' + os.path.relpath(fullpath, runtime)
+            zip_path = VIMRTDIR + '/' + os.path.relpath(fullpath, runtime)
             zf.write(fullpath, zip_path)
     with urlopen(EMBEDDED_PYTHON) as e:
         with open('tmp.zip', 'wb') as f:
             f.write(e.read())
         with zipfile.ZipFile('tmp.zip') as ep:
             for n in ep.namelist():
-                zf.writestr('Vim/python/' + n, ep.read(n))
+                zf.writestr('python/' + n, ep.read(n))
     zf.close()
 
     m = hashlib.sha256()
