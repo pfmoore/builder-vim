@@ -39,7 +39,7 @@ SDK_DIR = "C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v7.1A\\Include"
 
 @vim.command()
 def get(target='.'):
-    subprocess.check_call(['git', 'clone', VIM_URL, 'vim'], cwd=target)
+    subprocess.check_call(['git', 'clone', '-q', VIM_URL, 'vim'], cwd=target)
     version = subprocess.check_output(
         ['git', 'describe', '--tags'],
         universal_newlines=True,
@@ -47,6 +47,7 @@ def get(target='.'):
     ).strip()
     if version.startswith('v'):
         version = version[1:]
+    print("::set-output name={name}::{value}".format(name="version", value=version))
     return version
 
 @vim.command()
@@ -65,27 +66,26 @@ def patch(target='.'):
         ])
     
 
+def patch_makefile(filename):
+    content = Path(filename).read_text(encoding="latin1")
+    content = content.replace("LTCG:STATUS", "LTCG:NOSTATUS")
+    Path(filename).write_text(content, encoding="latin1")
+
+
 def get_vsvars(python):
-    sdk_dir = None
-    if python:
-        from distutils.msvccompiler import get_build_version
-        vc = int(get_build_version()) * 10
-        vclist = (vc,)
-    else:
-        vclist = (140, 100, 90)
-    for vc in vclist:
-        env = 'VS{}COMNTOOLS'.format(vc)
-        if env in os.environ:
-            bat = os.path.join(os.environ[env], '..', '..', 'VC', 'vcvarsall.bat')
-            if os.path.exists(bat):
-                return bat, vc
-    raise RuntimeError("Cannot find a suitable version of Visual Studio")
+    vsdevcmd = r'Program Files*\Microsoft Visual Studio\*\*\Common7\Tools\VsDevCmd.bat'
+    vsdev = next(Path("C:\\").glob(vsdevcmd), None)
+    if not vsdev:
+        raise RuntimeError("Cannot find vsdevcmd.bat")
+    return vsdev
 
 BUILD_SCRIPT = """\
-call "{vs}" {arch}
+set VSCMD_VCVARSALL_INIT=1
+call "{vs}" -no_logo -arch=amd64
 cd vim\\src
-nmake /f make_mvc.mak CPUNR=i686 WINVER=0x0500 {sdk} {py} {lua} {make}
-nmake /f make_mvc.mak GUI=yes DIRECTX=yes CPUNR=i686 WINVER=0x0500 {sdk} {py} {lua} {make}
+findstr LTCG Make_mvc.mak
+nmake /f make_mvc.mak CPUNR=i686 WINVER=0x0501 {py} {lua} {make}
+nmake /f make_mvc.mak GUI=yes DIRECTX=yes CPUNR=i686 WINVER=0x0501 {py} {lua} {make}
 """
 
 PY = 'PYTHON{v}="{prefix}" DYNAMIC_PYTHON{v}=yes PYTHON{v}_VER={vv}'.format(
@@ -95,21 +95,15 @@ PY = 'PYTHON{v}="{prefix}" DYNAMIC_PYTHON{v}=yes PYTHON{v}_VER={vv}'.format(
 
 @vim.command()
 def build(target='.', python=True, lua=True, make=''):
+    patch_makefile(os.path.join(target, "vim", "src", "Make_mvc.mak"))
     batbase = 'do_build.cmd'
     batfile = os.path.join(target, batbase)
-    vs, vc = get_vsvars(python)
-    if vc == 140 and not os.path.exists(SDK_DIR):
-        raise RuntimeError("Visual Studio 2015 needs the V7.1A Windows SDK")
+    vs = get_vsvars(python)
 
     py = PY if python else ""
-    lua = "LUA={here}\\lua LUA_VER=53".format(here=HERE) if lua else ""
-    arch = "amd64" if platform.architecture()[0] == '64bit' else "x86"
+    lua = "LUA={here}\\lua LUA_VER=53 DYNAMIC_LUA=no".format(here=HERE) if lua else ""
 
-    sdk = ""
-    if vc == 140:
-        sdk = 'SDK_INCLUDE_DIR="{}"'.format(SDK_DIR)
-
-    bat = BUILD_SCRIPT.format(vs=vs, arch=arch, py=py, lua=lua, make=make, sdk=sdk)
+    bat = BUILD_SCRIPT.format(vs=vs, py=py, lua=lua, make=make)
     with open(batfile, "w") as f:
         f.write(bat)
 
@@ -125,9 +119,14 @@ def package(target='.', version='unknown'):
         return os.path.join(target, 'vim', 'src', name)
     runtime = os.path.join(target, 'vim', 'runtime')
 
-    version_re = re.compile('.*VIM_VERSION_NODOT\\s*"(vim\\d\\d[^"]*)".*', re.S)
+    version_re = re.compile('#define.*VIM_VERSION_(MAJOR|MINOR)\\s*(\\d+).*', re.S)
+    ver_data = {}
     with open(src('version.h')) as f:
-        VIMRTDIR = version_re.match(f.read()).group(1)
+        for line in f:
+            m = version_re.match(line)
+            if m:
+                ver_data[m.group(1)] = m.group(2)
+    VIMRTDIR = "vim{MAJOR}{MINOR}".format_map(ver_data)
 
     zip_name = 'vim-{}.zip'.format(version)
     print("Writing {}".format(os.path.join(os.getcwd(), zip_name)))
