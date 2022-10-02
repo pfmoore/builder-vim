@@ -69,9 +69,9 @@ def patch(target='.'):
 def patch_makefile(filename):
     # Get rid of link-time code generation status messages, as these
     # produce huge logs in CI.
-    content = Path(filename).read_binary()
+    content = Path(filename).read_bytes()
     content = content.replace(b"LTCG:STATUS", b"LTCG:NOSTATUS")
-    Path(filename).write_binary(content)
+    Path(filename).write_bytes(content)
 
 
 def get_vsvars(python):
