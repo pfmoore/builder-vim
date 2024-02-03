@@ -41,10 +41,11 @@ SDK_DIR = "C:\\Program Files (x86)\\Microsoft SDKs\\Windows\\v7.1A\\Include"
 def get(target='.'):
     subprocess.check_call(['git', 'clone', '-q', VIM_URL, 'vim'], cwd=target)
     version = subprocess.check_output(
-        ['git', 'describe', '--tags'],
+        ['git', 'describe', '--tags', '--abbrev=0'],
         universal_newlines=True,
         cwd=os.path.join(target, 'vim')
     ).strip()
+    subprocess.check_call(['git', 'checkout', version], cwd=os.path.join(target, 'vim'))
     if version.startswith('v'):
         version = version[1:]
     with open(os.environ["GITHUB_OUTPUT"], "w", encoding="utf-8") as out:
