@@ -47,7 +47,8 @@ def get(target='.'):
     ).strip()
     if version.startswith('v'):
         version = version[1:]
-    print("::set-output name={name}::{value}".format(name="version", value=version))
+    with open(os.environ["GITHUB_OUTPUT"], "w", encoding="utf-8") as out:
+        print(f"version={version}", file=out)
     return version
 
 @vim.command()
