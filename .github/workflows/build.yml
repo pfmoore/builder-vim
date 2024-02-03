@@ -4,6 +4,7 @@ on:
         - cron: "30 0 * * 0"
     repository_dispatch:
         types: [build]
+    workflow_dispatch:
 jobs:
     get_vim:
         name: get_vim
